@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:geolocator/geolocator.dart'; // Import Geolocator
+import 'package:geolocator/geolocator.dart';
 import '../services/weather_service.dart';
 import '../services/news_service.dart';
+import 'news_page.dart';
 
 class FarmerHome extends StatefulWidget {
   @override
@@ -14,14 +15,14 @@ class _FarmerHomeState extends State<FarmerHome> {
   String temperature = "0°C";
   String icon = "🌤️";
   List<dynamic> newsHeadlines = [];
-  String cropSuggestion = "Fetching..."; // Location-based crop suggestion
+  String cropSuggestion = "Fetching...";
 
   @override
   void initState() {
     super.initState();
     _loadWeather();
     _loadNews();
-    _fetchLocationAndSuggestCrop(); // Added function
+    _fetchLocationAndSuggestCrop();
   }
 
   Future<void> _loadWeather() async {
@@ -46,22 +47,18 @@ class _FarmerHomeState extends State<FarmerHome> {
     });
   }
 
-  // 🔹 NEW FUNCTION: Fetch Location and Suggest Crop
   Future<void> _fetchLocationAndSuggestCrop() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      print("❌ Location services are disabled.");
+      print("❌ Location services disabled.");
       return;
     }
 
-    permission = await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.deniedForever) {
-        print("❌ Location permissions are permanently denied.");
+        print("❌ Location permissions permanently denied.");
         return;
       }
     }
@@ -69,18 +66,12 @@ class _FarmerHomeState extends State<FarmerHome> {
     Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high);
 
-    print("📍 Location: Lat: ${position.latitude}, Lng: ${position.longitude}");
-
-    // Hardcoded crop suggestions based on region (for now)
-    String suggestedCrop =
-    _getCropBasedOnLocation(position.latitude, position.longitude);
-
+    String suggestedCrop = _getCropBasedOnLocation(position.latitude, position.longitude);
     setState(() {
       cropSuggestion = suggestedCrop;
     });
   }
 
-  // 🔹 NEW FUNCTION: Crop Suggestion Based on Latitude
   String _getCropBasedOnLocation(double lat, double lon) {
     if (lat > 20.0) {
       return "🌾 Wheat";
@@ -97,97 +88,333 @@ class _FarmerHomeState extends State<FarmerHome> {
       appBar: AppBar(
         title: Text("Farmer Dashboard"),
         backgroundColor: Colors.green,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.logout),
-            onPressed: () async {
+        elevation: 0,
+      ),
+      drawer: _buildDrawer(),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return RefreshIndicator(
+              onRefresh: () async {
+                await _loadWeather();
+                await _loadNews();
+                await _fetchLocationAndSuggestCrop();
+              },
+              child: SingleChildScrollView(
+                physics: AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Top section with weather and crop suggestion
+                        Row(
+                          children: [
+                            Expanded(child: _buildWeatherCard()),
+                            SizedBox(width: 12),
+                            Expanded(child: _buildQuickCropSuggestion()),
+                          ],
+                        ),
+                        SizedBox(height: 12),
+                        // Middle section with stats and tasks
+                        Row(
+                          children: [
+                            Expanded(child: _buildFarmerStats()),
+                            SizedBox(width: 12),
+                            Expanded(child: _buildTodaysTasks()),
+                          ],
+                        ),
+                        SizedBox(height: 16),
+                        // Bottom section with announcements
+                        _buildAnnouncements(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _navigateToAllAnnouncementsPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text("All Announcements"),
+            backgroundColor: Colors.green,
+          ),
+          body: ListView.builder(
+            itemCount: newsHeadlines.length,
+            itemBuilder: (context, index) {
+              final article = newsHeadlines[index];
+              return Card(
+                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ListTile(
+                  title: Text(article['title']),
+                  subtitle: Text(article['description'] ?? "No description available"),
+                  trailing: Icon(Icons.arrow_forward_ios),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => NewsPage(newsUrl: article['url']),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawer() {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(
+              color: Colors.green,
+              image: DecorationImage(
+                image: NetworkImage("https://via.placeholder.com/400x200"),
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(
+                  Colors.green.withOpacity(0.7),
+                  BlendMode.darken,
+                ),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white,
+                  radius: 30,
+                  child: Icon(Icons.person, size: 40, color: Colors.green),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  "Farmer Menu",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _drawerItem(Icons.grass, "Crop Recommendation"),
+          _drawerItem(Icons.healing, "Disease Detection"),
+          _drawerItem(Icons.store, "Marketplace"),
+          _drawerItem(Icons.language, "Multi-Language Support"),
+          Divider(),
+          ListTile(
+            leading: Icon(Icons.logout, color: Colors.red),
+            title: Text("Logout"),
+            onTap: () async {
               await FirebaseAuth.instance.signOut();
               Navigator.pushReplacementNamed(context, '/login');
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+    );
+  }
+
+  ListTile _drawerItem(IconData icon, String title) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.green.shade800),
+      title: Text(title),
+      onTap: () {
+        Navigator.pop(context);
+        // Add navigation logic here in the future
+      },
+    );
+  }
+
+  Widget _buildWeatherCard() {
+    return _dashboardCard(
+      icon: "☀️",
+      title: "Today's Weather",
+      subtitle: "$temperature, $weatherDescription",
+      iconColor: Colors.blue.shade200,
+      iconBgColor: Colors.blue.shade100,
+    );
+  }
+
+  Widget _buildQuickCropSuggestion() {
+    return _dashboardCard(
+      icon: "🌱",
+      title: "Crop Suggestion",
+      subtitle: "Best crop: $cropSuggestion",
+      iconColor: Colors.green.shade200,
+      iconBgColor: Colors.green.shade100,
+    );
+  }
+
+  Widget _buildFarmerStats() {
+    return _dashboardCard(
+      icon: "📊",
+      title: "Farmer Stats",
+      subtitle: "Crops Sold: 120 | Pending: 5",
+      iconColor: Colors.orange.shade200,
+      iconBgColor: Colors.orange.shade100,
+    );
+  }
+
+  Widget _buildTodaysTasks() {
+    return _dashboardCard(
+      icon: "✅",
+      title: "Today's Tasks",
+      subtitle: "Water crops, check soil",
+      iconColor: Colors.purple.shade200,
+      iconBgColor: Colors.purple.shade100,
+    );
+  }
+
+  Widget _buildAnnouncements() {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 3,
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildWeatherCard(),
-            SizedBox(height: 10),
-            _buildQuickCropSuggestion(),
-            SizedBox(height: 10),
-            _buildFarmerStats(),
-            SizedBox(height: 10),
-            _buildAnnouncements(),
-            SizedBox(height: 10),
-            _buildTodaysTasks(),
+            Row(
+              children: [
+                Icon(Icons.campaign, color: Colors.red),
+                SizedBox(width: 8),
+                Text(
+                  "Announcements",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            Divider(),
+            if (newsHeadlines.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Center(
+                  child: Text(
+                    "No announcements available",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: newsHeadlines.length > 3 ? 3 : newsHeadlines.length,
+                itemBuilder: (context, index) {
+                  final article = newsHeadlines[index];
+                  return Card(
+                    margin: EdgeInsets.only(bottom: 8),
+                    elevation: 1,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      title: Text(
+                        article['title'],
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => NewsPage(newsUrl: article['url']),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            if (newsHeadlines.length > 3)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Center(
+                  child: TextButton.icon(
+                    icon: Icon(Icons.more_horiz),
+                    label: Text("View All"),
+                    onPressed: _navigateToAllAnnouncementsPage,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.purple,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickCropSuggestion() {
+  Widget _dashboardCard({
+    required String icon,
+    required String title,
+    required String subtitle,
+    required Color iconColor,
+    required Color iconBgColor,
+  }) {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 3,
-      child: ListTile(
-        leading: Icon(Icons.agriculture, color: Colors.green),
-        title: Text("Quick Crop Suggestion"),
-        subtitle: Text("🌱 Best crop to plant now: $cropSuggestion"),
-      ),
-    );
-  }
-
-  Widget _buildWeatherCard() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      elevation: 3,
-      child: ListTile(
-        leading: Text(icon, style: TextStyle(fontSize: 24)),
-        title: Text("Today's Weather"),
-        subtitle: Text("$temperature, $weatherDescription"),
-      ),
-    );
-  }
-
-  Widget _buildFarmerStats() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      elevation: 3,
-      child: ListTile(
-        leading: Icon(Icons.bar_chart, color: Colors.blue),
-        title: Text("Farmer Statistics"),
-        subtitle: Text("🌾 Crops Sold: 120  | 📦 Pending Orders: 5"),
-      ),
-    );
-  }
-
-  Widget _buildAnnouncements() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      elevation: 3,
-      child: Column(
-        children: newsHeadlines.isEmpty
-            ? [ListTile(title: Text("No announcements available"))]
-            : newsHeadlines.take(5).map((article) {
-          return ListTile(
-            leading: Icon(Icons.campaign, color: Colors.red),
-            title: Text(article['title']),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildTodaysTasks() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      elevation: 3,
-      child: ListTile(
-        leading: Icon(Icons.check_circle_outline, color: Colors.green),
-        title: Text("Today's Tasks"),
-        subtitle: Text("📝 Water the crops, Check soil condition"),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(icon, style: TextStyle(fontSize: 24)),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                    // Removed maxLines and overflow to ensure full text is visible
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+            Text(
+              subtitle,
+              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -211,5 +438,4 @@ class _FarmerHomeState extends State<FarmerHome> {
         return '🌤️'; // Default to partly cloudy
     }
   }
-
 }
