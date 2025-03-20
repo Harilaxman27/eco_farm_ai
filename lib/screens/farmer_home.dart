@@ -1,7 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/weather_service.dart';
 
-class FarmerHome extends StatelessWidget {
+class FarmerHome extends StatefulWidget {
+  @override
+  _FarmerHomeState createState() => _FarmerHomeState();
+}
+
+class _FarmerHomeState extends State<FarmerHome> {
+  String weatherDescription = "Loading...";
+  String temperature = "0°C";
+  String icon = "🌤️";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWeather();
+  }
+
+  Future<void> _loadWeather() async {
+    WeatherService weatherService = WeatherService();
+    try {
+      Map<String, dynamic> weatherData = await weatherService.fetchWeather();
+      setState(() {
+        weatherDescription = weatherData['weather'][0]['description'];
+        temperature = "${weatherData['main']['temp']}°C";
+        icon = _getWeatherIcon(weatherData['weather'][0]['main']);
+      });
+    } catch (e) {
+      print("❌ Error fetching weather: $e");
+    }
+  }
+
+  String _getWeatherIcon(String condition) {
+    switch (condition.toLowerCase()) {
+      case "clear":
+        return "☀️";
+      case "clouds":
+        return "☁️";
+      case "rain":
+        return "🌧️";
+      case "snow":
+        return "❄️";
+      default:
+        return "🌤️";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -77,9 +122,9 @@ class FarmerHome extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       elevation: 3,
       child: ListTile(
-        leading: Icon(Icons.wb_sunny, color: Colors.orange),
+        leading: Text(icon, style: TextStyle(fontSize: 24)),
         title: Text("Today's Weather"),
-        subtitle: Text("🌤️ 28°C, Sunny"),
+        subtitle: Text("$temperature, $weatherDescription"),
       ),
     );
   }
@@ -124,28 +169,10 @@ class FarmerHome extends StatelessWidget {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       elevation: 3,
-      child: Column(
-        children: [
-          ListTile(
-            leading: Icon(Icons.check_circle_outline, color: Colors.green),
-            title: Text("Today's Tasks"),
-          ),
-          CheckboxListTile(
-            title: Text("Water the crops"),
-            value: false,
-            onChanged: (bool? value) {},
-          ),
-          CheckboxListTile(
-            title: Text("Check soil condition"),
-            value: true,
-            onChanged: (bool? value) {},
-          ),
-          CheckboxListTile(
-            title: Text("Sell crops in marketplace"),
-            value: false,
-            onChanged: (bool? value) {},
-          ),
-        ],
+      child: ListTile(
+        leading: Icon(Icons.check_circle_outline, color: Colors.green),
+        title: Text("Today's Tasks"),
+        subtitle: Text("📝 Water the crops, Check soil condition"),
       ),
     );
   }
