@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "637392038871",
+    "project_id": "ecofarmai",
+    "storage_bucket": "ecofarmai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:637392038871:android:57e13b1e3ede672fb4b992",
+        "android_client_info": {
+          "package_name": "com.example.eco_farm_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDs2PLGjoAHX_uBCRkseX8dFtBGX-glo2o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
