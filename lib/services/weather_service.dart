@@ -39,7 +39,7 @@ class WeatherService {
   }
 
   Future<Map<String, dynamic>> _fetchWeatherFromAPI(double lat, double lon) async {
-    String url = "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$apiKey&units=metric";
+    String url = "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=bc6b823f5dde66cca83bda2715ade562&units=metric";
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/weather_service.dart';
+import '../services/news_service.dart';
+import 'news_page.dart';
 
 class FarmerHome extends StatefulWidget {
   @override
@@ -11,11 +13,13 @@ class _FarmerHomeState extends State<FarmerHome> {
   String weatherDescription = "Loading...";
   String temperature = "0°C";
   String icon = "🌤️";
+  List<dynamic> newsHeadlines = [];
 
   @override
   void initState() {
     super.initState();
     _loadWeather();
+    _loadNews();
   }
 
   Future<void> _loadWeather() async {
@@ -30,6 +34,14 @@ class _FarmerHomeState extends State<FarmerHome> {
     } catch (e) {
       print("❌ Error fetching weather: $e");
     }
+  }
+
+  Future<void> _loadNews() async {
+    NewsService newsService = NewsService();
+    List<dynamic> articles = await newsService.fetchNews();
+    setState(() {
+      newsHeadlines = articles;
+    });
   }
 
   String _getWeatherIcon(String condition) {
@@ -157,13 +169,47 @@ class _FarmerHomeState extends State<FarmerHome> {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       elevation: 3,
-      child: ListTile(
-        leading: Icon(Icons.campaign, color: Colors.red),
-        title: Text("Announcements"),
-        subtitle: Text("📢 New government scheme available for farmers."),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Announcements Heading
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Text(
+              "📢 Announcements",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+
+          // List of Farmer News
+          if (newsHeadlines.isEmpty)
+            ListTile(title: Text("No announcements available"))
+          else
+            Column(
+              children: newsHeadlines.take(5).map((article) {
+                return ListTile(
+                  leading: Icon(Icons.campaign, color: Colors.red),
+                  title: Text(article['title']),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => NewsPage(newsUrl: article['url']),
+                      ),
+                    );
+                  },
+                );
+              }).toList(),
+            ),
+        ],
       ),
     );
   }
+
 
   Widget _buildTodaysTasks() {
     return Card(
