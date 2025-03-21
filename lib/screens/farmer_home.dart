@@ -1,3 +1,4 @@
+import 'package:eco_farm_ai/screens/crop_recommendation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
@@ -215,7 +216,13 @@ class _FarmerHomeState extends State<FarmerHome> {
               ],
             ),
           ),
-          _drawerItem(Icons.grass, "Crop Recommendation"),
+          ListTile(
+            leading: Icon(Icons.grass,color: Colors.green.shade800,),
+            title: Text("AI Crop Recommendation"),
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => CropRecommendationScreen()));
+            },
+          ),
           _drawerItem(Icons.healing, "Disease Detection"),
           _drawerItem(Icons.store, "Marketplace"),
           _drawerItem(Icons.language, "Multi-Language Support"),
