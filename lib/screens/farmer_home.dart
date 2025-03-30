@@ -87,59 +87,350 @@ class _FarmerHomeState extends State<FarmerHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text("Farmer Dashboard"),
-        backgroundColor: Colors.green,
+        title: Text(
+          "Farmer Dashboard",
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        ),
+        backgroundColor: Colors.green.withOpacity(0.9),
         elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.notifications_outlined),
+            onPressed: () {},
+            tooltip: "Notifications",
+          ),
+        ],
       ),
       drawer: _buildDrawer(),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return RefreshIndicator(
-              onRefresh: () async {
-                await _loadWeather();
-                await _loadNews();
-                await _fetchLocationAndSuggestCrop();
-              },
-              child: SingleChildScrollView(
-                physics: AlwaysScrollableScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Top section with weather and crop suggestion
-                        Row(
-                          children: [
-                            Expanded(child: _buildWeatherCard()),
-                            SizedBox(width: 12),
-                            Expanded(child: _buildQuickCropSuggestion()),
-                          ],
-                        ),
-                        SizedBox(height: 12),
-                        // Middle section with stats and tasks
-                        Row(
-                          children: [
-                            Expanded(child: _buildFarmerStats()),
-                            SizedBox(width: 12),
-                            Expanded(child: _buildTodaysTasks()),
-                          ],
-                        ),
-                        SizedBox(height: 16),
-                        // Bottom section with announcements
-                        _buildAnnouncements(),
-                      ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.green.shade50,
+              Colors.white,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return RefreshIndicator(
+                onRefresh: () async {
+                  await _loadWeather();
+                  await _loadNews();
+                  await _fetchLocationAndSuggestCrop();
+                },
+                color: Colors.green,
+                child: SingleChildScrollView(
+                  physics: AlwaysScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildGreeting(),
+                          SizedBox(height: 16),
+
+                          // Quick actions
+                          _buildQuickActions(),
+                          SizedBox(height: 20),
+
+                          // Weather and crop suggestion
+                          _buildWeatherAndCropSection(),
+                          SizedBox(height: 20),
+
+                          // Farmer stats
+                          _buildFarmerStatsSection(),
+                          SizedBox(height: 20),
+
+                          // Announcements section
+                          _buildAnnouncementsSection(),
+                          SizedBox(height: 16),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {},
+        backgroundColor: Colors.green,
+        child: Icon(Icons.add),
+        tooltip: "Add new task",
+      ),
+    );
+  }
+
+  Widget _buildGreeting() {
+    final now = DateTime.now();
+    String greeting = "Good morning";
+    if (now.hour >= 12 && now.hour < 17) {
+      greeting = "Good afternoon";
+    } else if (now.hour >= 17) {
+      greeting = "Good evening";
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            greeting,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.green.shade800,
+            ),
+          ),
+          Text(
+            "Here's what's happening on your farm today",
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            "Quick Actions",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildActionButton(
+              icon: Icons.grass,
+              label: "Crop\nRecommendation",
+              color: Colors.green.shade600,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => CropRecommendationScreen()));
+              },
+            ),
+            _buildActionButton(
+              icon: Icons.bug_report,
+              label: "Disease\nDetection",
+              color: Colors.orange.shade700,
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => CropDiseaseDetectionScreen()));
+              },
+            ),
+            _buildActionButton(
+              icon: Icons.store,
+              label: "Market\nplace",
+              color: Colors.blue.shade600,
+              onTap: () {},
+            ),
+            _buildActionButton(
+              icon: Icons.water_drop,
+              label: "Irrigation\nSchedule",
+              color: Colors.purple.shade600,
+              onTap: () {},
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherAndCropSection() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.green.shade400, Colors.green.shade600],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.3),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  icon,
+                  style: TextStyle(fontSize: 36),
+                ),
+                SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      temperature,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      weatherDescription,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            Divider(color: Colors.white.withOpacity(0.3), height: 24),
+            Row(
+              children: [
+                Icon(Icons.eco, color: Colors.white),
+                SizedBox(width: 8),
+                Text(
+                  "Recommended Crop:",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(width: 8),
+                Text(
+                  cropSuggestion.split(" ").last,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFarmerStatsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            "Farm Overview",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(child: _buildFarmerStats()),
+            SizedBox(width: 12),
+            Expanded(child: _buildTodaysTasks()),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAnnouncementsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Latest Announcements",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              if (newsHeadlines.length > 3)
+                TextButton(
+                  onPressed: _navigateToAllAnnouncementsPage,
+                  child: Text(
+                    "View All",
+                    style: TextStyle(color: Colors.green.shade700),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        _buildAnnouncements(),
+      ],
     );
   }
 
@@ -158,10 +449,24 @@ class _FarmerHomeState extends State<FarmerHome> {
               final article = newsHeadlines[index];
               return Card(
                 margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
                 child: ListTile(
-                  title: Text(article['title']),
-                  subtitle: Text(article['description'] ?? "No description available"),
-                  trailing: Icon(Icons.arrow_forward_ios),
+                  contentPadding: EdgeInsets.all(12),
+                  title: Text(
+                    article['title'],
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      article['description'] ?? "No description available",
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                  ),
+                  trailing: Icon(Icons.arrow_forward_ios, size: 16),
                   onTap: () {
                     Navigator.push(
                       context,
@@ -186,7 +491,11 @@ class _FarmerHomeState extends State<FarmerHome> {
         children: [
           DrawerHeader(
             decoration: BoxDecoration(
-              color: Colors.green,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.green.shade500, Colors.green.shade700],
+              ),
               image: DecorationImage(
                 image: NetworkImage("https://via.placeholder.com/400x200"),
                 fit: BoxFit.cover,
@@ -205,43 +514,62 @@ class _FarmerHomeState extends State<FarmerHome> {
                   radius: 30,
                   child: Icon(Icons.person, size: 40, color: Colors.green),
                 ),
-                SizedBox(height: 8),
+                SizedBox(height: 12),
                 Text(
                   "Farmer Menu",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  "Manage your farm efficiently",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
           ),
-          ListTile(
-            leading: Icon(Icons.grass,color: Colors.green.shade800,),
-            title: Text("AI Crop Recommendation"),
+          _buildDrawerItem(
+            icon: Icons.grass,
+            title: "AI Crop Recommendation",
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => CropRecommendationScreen()));
             },
           ),
-          ListTile(
-            leading: Icon(Icons.bug_report, color: Colors.green.shade800,),
-            title: Text("Crop Disease Detection"),
+          _buildDrawerItem(
+            icon: Icons.bug_report,
+            title: "Crop Disease Detection",
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => CropDiseaseDetectionScreen()), // ✅ Correct class name
+                MaterialPageRoute(builder: (context) => CropDiseaseDetectionScreen()),
               );
             },
           ),
-
-
-          _drawerItem(Icons.store, "Marketplace"),
-          _drawerItem(Icons.language, "Multi-Language Support"),
+          _buildDrawerItem(
+            icon: Icons.store,
+            title: "Marketplace",
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+          _buildDrawerItem(
+            icon: Icons.language,
+            title: "Multi-Language Support",
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
           Divider(),
-          ListTile(
-            leading: Icon(Icons.logout, color: Colors.red),
-            title: Text("Logout"),
+          _buildDrawerItem(
+            icon: Icons.logout,
+            title: "Logout",
+            textColor: Colors.red,
             onTap: () async {
               await FirebaseAuth.instance.signOut();
               Navigator.pushReplacementNamed(context, '/login');
@@ -252,88 +580,215 @@ class _FarmerHomeState extends State<FarmerHome> {
     );
   }
 
-  ListTile _drawerItem(IconData icon, String title) {
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color? textColor,
+  }) {
     return ListTile(
-      leading: Icon(icon, color: Colors.green.shade800),
-      title: Text(title),
-      onTap: () {
-        Navigator.pop(context);
-        // Add navigation logic here in the future
-      },
-    );
-  }
-
-  Widget _buildWeatherCard() {
-    return _dashboardCard(
-      icon: "☀️",
-      title: "Today's Weather",
-      subtitle: "$temperature, $weatherDescription",
-      iconColor: Colors.blue.shade200,
-      iconBgColor: Colors.blue.shade100,
-    );
-  }
-
-  Widget _buildQuickCropSuggestion() {
-    return _dashboardCard(
-      icon: "🌱",
-      title: "Crop Suggestion",
-      subtitle: "Best crop: $cropSuggestion",
-      iconColor: Colors.green.shade200,
-      iconBgColor: Colors.green.shade100,
+      leading: Icon(
+        icon,
+        color: textColor ?? Colors.green.shade800,
+        size: 22,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: textColor,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
+      contentPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      dense: true,
     );
   }
 
   Widget _buildFarmerStats() {
-    return _dashboardCard(
-      icon: "📊",
-      title: "Farmer Stats",
-      subtitle: "Crops Sold: 120 | Pending: 5",
-      iconColor: Colors.orange.shade200,
-      iconBgColor: Colors.orange.shade100,
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 3,
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.assessment,
+                    color: Colors.orange.shade700,
+                    size: 22,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    "Harvest Stats",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildStatItem(
+                  label: "Crops Sold",
+                  value: "120",
+                  color: Colors.green,
+                ),
+                _buildStatItem(
+                  label: "Pending",
+                  value: "5",
+                  color: Colors.orange,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildTodaysTasks() {
-    return _dashboardCard(
-      icon: "✅",
-      title: "Today's Tasks",
-      subtitle: "Water crops, check soil",
-      iconColor: Colors.purple.shade200,
-      iconBgColor: Colors.purple.shade100,
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 3,
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.purple.shade700,
+                    size: 22,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    "Today's Tasks",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+            _buildTaskItem("Water crops", true),
+            _buildTaskItem("Check soil condition", false),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTaskItem(String task, bool completed) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        children: [
+          Icon(
+            completed ? Icons.check_circle : Icons.circle_outlined,
+            size: 18,
+            color: completed ? Colors.green : Colors.grey,
+          ),
+          SizedBox(width: 8),
+          Expanded( // Add this Expanded widget
+            child: Text(
+              task,
+              style: TextStyle(
+                fontSize: 14,
+                color: completed ? Colors.grey : Colors.black87,
+                decoration: completed ? TextDecoration.lineThrough : null,
+              ),
+              overflow: TextOverflow.ellipsis, // Add this to handle overflow
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildAnnouncements() {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 3,
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.campaign, color: Colors.red),
-                SizedBox(width: 8),
-                Text(
-                  "Announcements",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-            Divider(),
             if (newsHeadlines.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Center(
-                  child: Text(
-                    "No announcements available",
-                    style: TextStyle(color: Colors.grey),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.campaign_outlined,
+                        size: 48,
+                        color: Colors.grey.shade400,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        "No announcements available",
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ],
                   ),
                 ),
               )
@@ -344,18 +799,36 @@ class _FarmerHomeState extends State<FarmerHome> {
                 itemCount: newsHeadlines.length > 3 ? 3 : newsHeadlines.length,
                 itemBuilder: (context, index) {
                   final article = newsHeadlines[index];
-                  return Card(
-                    margin: EdgeInsets.only(bottom: 8),
-                    elevation: 1,
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade200),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: ListTile(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.article,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
                       title: Text(
                         article['title'],
-                        style: TextStyle(fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                      trailing: Icon(Icons.arrow_forward_ios, size: 14),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -368,70 +841,6 @@ class _FarmerHomeState extends State<FarmerHome> {
                   );
                 },
               ),
-            if (newsHeadlines.length > 3)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Center(
-                  child: TextButton.icon(
-                    icon: Icon(Icons.more_horiz),
-                    label: Text("View All"),
-                    onPressed: _navigateToAllAnnouncementsPage,
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.purple,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _dashboardCard({
-    required String icon,
-    required String title,
-    required String subtitle,
-    required Color iconColor,
-    required Color iconBgColor,
-  }) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 3,
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: iconBgColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(icon, style: TextStyle(fontSize: 24)),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                    // Removed maxLines and overflow to ensure full text is visible
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 12),
-            Text(
-              subtitle,
-              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-            ),
           ],
         ),
       ),
