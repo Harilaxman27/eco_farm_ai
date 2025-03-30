@@ -1,0 +1,5 @@
+0  Healthy Crop
+1 Late Blight
+2 Rust
+3 Leaf Spot
+4 Bacterial Blight
