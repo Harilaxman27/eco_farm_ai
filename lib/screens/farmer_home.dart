@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/weather_service.dart';
 import '../services/news_service.dart';
+import 'disease_detection_screen.dart';
 import 'news_page.dart';
 
 class FarmerHome extends StatefulWidget {
@@ -223,7 +224,18 @@ class _FarmerHomeState extends State<FarmerHome> {
               Navigator.push(context, MaterialPageRoute(builder: (context) => CropRecommendationScreen()));
             },
           ),
-          _drawerItem(Icons.healing, "Disease Detection"),
+          ListTile(
+            leading: Icon(Icons.bug_report, color: Colors.green),
+            title: Text("Crop Disease Detection"),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => CropDiseaseDetectionScreen()), // ✅ Correct class name
+              );
+            },
+          ),
+
+
           _drawerItem(Icons.store, "Marketplace"),
           _drawerItem(Icons.language, "Multi-Language Support"),
           Divider(),
