@@ -225,7 +225,7 @@ class _FarmerHomeState extends State<FarmerHome> {
             },
           ),
           ListTile(
-            leading: Icon(Icons.bug_report, color: Colors.green),
+            leading: Icon(Icons.bug_report, color: Colors.green.shade800,),
             title: Text("Crop Disease Detection"),
             onTap: () {
               Navigator.push(
