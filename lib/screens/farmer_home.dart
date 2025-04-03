@@ -246,8 +246,8 @@ class _FarmerHomeState extends State<FarmerHome> {
               },
             ),
             _buildActionButton(
-              icon: Icons.water_drop,
-              label: "Irrigation\nSchedule",
+              icon: Icons.language,
+              label: "Multi\nLauguage",
               color: Colors.purple.shade600,
               onTap: () {},
             ),
