@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert'; // Required for Base64 conversion
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,18 +12,16 @@ class MarketplaceScreen extends StatefulWidget {
 
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  File? _selectedImage;
+  String? _base64Image; // Store Base64 string instead of File
   final TextEditingController _cropNameController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
 
   @override
   void dispose() {
     _cropNameController.dispose();
     _quantityController.dispose();
     _priceController.dispose();
-    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -58,28 +57,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 var listings = snapshot.data!.docs;
 
                 if (listings.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.store, size: 64, color: Colors.green.withOpacity(0.5)),
-                        SizedBox(height: 16),
-                        Text("No crops listed yet", style: TextStyle(fontSize: 18, color: Colors.grey.shade700)),
-                        SizedBox(height: 8),
-                        Text("Add your first crop to start selling", style: TextStyle(color: Colors.grey.shade600)),
-                        SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: () => _showAddCropDialog(context),
-                          icon: Icon(Icons.add),
-                          label: Text("Add Your First Crop"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
+                  return _buildEmptyState();
                 }
 
                 return ListView.builder(
@@ -88,14 +66,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   itemBuilder: (context, index) {
                     var crop = listings[index].data() as Map<String, dynamic>;
 
-                    // Extract data safely
                     String cropName = crop['cropName'] ?? "Unknown Crop";
                     double quantity = (crop['quantity'] as num?)?.toDouble() ?? 0.0;
                     double pricePerKg = (crop['pricePerKg'] as num?)?.toDouble() ?? 0.0;
-                    String imageUrl = crop['imageUrl'] ?? "";
+                    String base64Image = crop['imageUrl'] ?? "";
                     Timestamp? uploadTimestamp = crop['uploadDate'];
 
-                    // Calculate days on market and freshness
                     DateTime uploadDate = uploadTimestamp?.toDate() ?? DateTime.now();
                     int daysOnMarket = DateTime.now().difference(uploadDate).inDays;
                     int freshness = (10 - daysOnMarket).clamp(0, 10);
@@ -104,8 +80,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       margin: EdgeInsets.only(bottom: 12),
                       elevation: 2,
                       child: ListTile(
-                        leading: imageUrl.isNotEmpty
-                            ? Image.network(imageUrl, width: 60, height: 60, fit: BoxFit.cover)
+                        leading: base64Image.isNotEmpty
+                            ? Image.memory(base64Decode(base64Image), width: 60, height: 60, fit: BoxFit.cover)
                             : Icon(Icons.image, size: 60, color: Colors.grey),
                         title: Text("$cropName - ${quantity.toStringAsFixed(2)} kg"),
                         subtitle: Text("₹${pricePerKg.toStringAsFixed(2)}/kg - Freshness: $freshness/10"),
@@ -136,12 +112,38 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     );
   }
 
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.store, size: 64, color: Colors.green.withOpacity(0.5)),
+          SizedBox(height: 16),
+          Text("No crops listed yet", style: TextStyle(fontSize: 18, color: Colors.grey.shade700)),
+          SizedBox(height: 8),
+          Text("Add your first crop to start selling", style: TextStyle(color: Colors.grey.shade600)),
+          SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => _showAddCropDialog(context),
+            icon: Icon(Icons.add),
+            label: Text("Add Your First Crop"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickImage() async {
     final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
+      File imageFile = File(pickedFile.path);
+      List<int> imageBytes = await imageFile.readAsBytes();
+      _base64Image = base64Encode(imageBytes); // ✅ Convert to Base64
+      setState(() {});
     }
   }
 
@@ -149,8 +151,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     _cropNameController.clear();
     _quantityController.clear();
     _priceController.clear();
-    _descriptionController.clear();
-    _selectedImage = null;
+    _base64Image = null;
 
     showModalBottomSheet(
       context: context,
@@ -176,8 +177,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       height: 150,
                       width: double.infinity,
                       color: Colors.grey.shade200,
-                      child: _selectedImage != null
-                          ? Image.file(_selectedImage!, fit: BoxFit.cover)
+                      child: _base64Image != null
+                          ? Image.memory(base64Decode(_base64Image!), fit: BoxFit.cover)
                           : Icon(Icons.add_photo_alternate, size: 50, color: Colors.grey),
                     ),
                   ),
@@ -190,15 +191,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   SizedBox(height: 20),
                   ElevatedButton(
                     onPressed: () async {
-                      if (_selectedImage != null) {
-                        await _firebaseService.addCropListing(
-                          _cropNameController.text,
-                          double.parse(_quantityController.text),
-                          double.parse(_priceController.text),
-                          _selectedImage!,
-                        );
-                        Navigator.pop(context);
+                      if (_base64Image == null) {
+                        print("⚠ No image selected");
+                        return;
                       }
+
+                      print("✅ Uploading crop...");
+                      await _firebaseService.addCropListing(
+                        _cropNameController.text,
+                        double.parse(_quantityController.text),
+                        double.parse(_priceController.text),
+                        _base64Image!, // ✅ Pass Base64 image instead of File
+                      );
+                      Navigator.pop(context);
                     },
                     child: Text("Add Crop"),
                   ),

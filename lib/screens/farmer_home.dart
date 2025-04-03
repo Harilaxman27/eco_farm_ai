@@ -166,12 +166,6 @@ class _FarmerHomeState extends State<FarmerHome> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: Colors.green,
-        child: Icon(Icons.add),
-        tooltip: "Add new task",
-      ),
     );
   }
 
@@ -247,7 +241,9 @@ class _FarmerHomeState extends State<FarmerHome> {
               icon: Icons.store,
               label: "Market\nplace",
               color: Colors.blue.shade600,
-              onTap: () {},
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => MarketplaceScreen()));
+              },
             ),
             _buildActionButton(
               icon: Icons.water_drop,

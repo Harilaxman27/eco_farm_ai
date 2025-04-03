@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,7 +21,7 @@ class BuyerHome extends StatelessWidget {
           IconButton(
             icon: Icon(Icons.logout),
             onPressed: () async {
-              await FirebaseAuth.instance.signOut(); // Logout user
+              await FirebaseAuth.instance.signOut();
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => LoginScreen()),
@@ -84,17 +85,15 @@ class BuyerHome extends StatelessWidget {
                   itemCount: listings.length,
                   itemBuilder: (context, index) {
                     var crop = listings[index];
-                    var cropData = crop.data() as Map<String, dynamic>; // Explicitly cast to Map
+                    var cropData = crop.data() as Map<String, dynamic>;
 
-                    // Ensure required fields exist
-                    String cropName = cropData.containsKey('cropName') ? cropData['cropName'] : 'Unknown Crop';
-                    double quantity = cropData.containsKey('quantity') ? (cropData['quantity'] as num).toDouble() : 0.0;
-                    double pricePerKg = cropData.containsKey('pricePerKg') ? (cropData['pricePerKg'] as num).toDouble() : 0.0;
-                    String imageUrl = cropData.containsKey('imageUrl') ? cropData['imageUrl'] : "";
-                    Timestamp? uploadTimestamp = cropData.containsKey('uploadDate') ? cropData['uploadDate'] : null;
+                    String cropName = cropData['cropName'] ?? 'Unknown Crop';
+                    double quantity = (cropData['quantity'] as num?)?.toDouble() ?? 0.0;
+                    double pricePerKg = (cropData['pricePerKg'] as num?)?.toDouble() ?? 0.0;
+                    String base64Image = cropData['imageBase64'] ?? "";
+                    Timestamp? uploadTimestamp = cropData['uploadDate'];
 
-                    // Handle missing uploadDate
-                    DateTime uploadDate = uploadTimestamp != null ? uploadTimestamp.toDate() : DateTime.now();
+                    DateTime uploadDate = uploadTimestamp?.toDate() ?? DateTime.now();
                     double updatedPrice = _calculatePrice(pricePerKg, uploadDate);
                     int updatedFreshness = _calculateFreshness(uploadDate);
                     Color freshnessColor = _getFreshnessColor(updatedFreshness);
@@ -116,23 +115,15 @@ class BuyerHome extends StatelessWidget {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                                  child: imageUrl.isNotEmpty
-                                      ? Image.network(
-                                    imageUrl,
+                                  child: base64Image.isNotEmpty
+                                      ? Image.memory(
+                                    base64Decode(base64Image),
                                     height: 100,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => Container(
-                                      height: 100,
-                                      color: Colors.grey.shade200,
-                                      child: Icon(Icons.image, size: 40, color: Colors.grey),
-                                    ),
+                                    errorBuilder: (context, error, stackTrace) => _imagePlaceholder(),
                                   )
-                                      : Container(
-                                    height: 100,
-                                    color: Colors.grey.shade200,
-                                    child: Icon(Icons.image, size: 40, color: Colors.grey),
-                                  ),
+                                      : _imagePlaceholder(),
                                 ),
                                 // Freshness badge
                                 Positioned(
@@ -209,151 +200,54 @@ class BuyerHome extends StatelessWidget {
     String cropName = cropData['cropName'] ?? 'Unknown Crop';
     double quantity = (cropData['quantity'] as num?)?.toDouble() ?? 0.0;
     double pricePerKg = (cropData['pricePerKg'] as num?)?.toDouble() ?? 0.0;
-    String imageUrl = cropData['imageUrl'] ?? "";
+    String base64Image = cropData['imageBase64'] ?? "";
     Timestamp? uploadTimestamp = cropData['uploadDate'];
 
-    DateTime uploadDate = uploadTimestamp != null ? uploadTimestamp.toDate() : DateTime.now();
+    DateTime uploadDate = uploadTimestamp?.toDate() ?? DateTime.now();
     double updatedPrice = _calculatePrice(pricePerKg, uploadDate);
     int freshness = _calculateFreshness(uploadDate);
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (context) {
-        return Container(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        return AlertDialog(
+          title: Text(cropName),
+          content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Crop image
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: imageUrl.isNotEmpty
-                        ? Image.network(
-                      imageUrl,
-                      width: 100,
-                      height: 100,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: 100,
-                        height: 100,
-                        color: Colors.grey.shade200,
-                        child: Icon(Icons.image, size: 40, color: Colors.grey),
-                      ),
-                    )
-                        : Container(
-                      width: 100,
-                      height: 100,
-                      color: Colors.grey.shade200,
-                      child: Icon(Icons.image, size: 40, color: Colors.grey),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          cropName,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          "₹${updatedPrice.toStringAsFixed(2)} per kg",
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.green.shade700,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          "Available: ${quantity.toStringAsFixed(1)} kg",
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(Icons.eco, color: _getFreshnessColor(freshness), size: 16),
-                            SizedBox(width: 4),
-                            Text(
-                              "Freshness: $freshness/10",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 20),
-              Text(
-                "Description",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                cropData['description'] ?? "Fresh produce directly from the farm. No chemicals used.",
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                ),
-              ),
-              SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      icon: Icon(Icons.favorite_border),
-                      label: Text("Save"),
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        // Add purchase functionality
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Added to cart")),
-                        );
-                        Navigator.pop(context);
-                      },
-                      icon: Icon(Icons.shopping_cart),
-                      label: Text("Add to Cart"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              base64Image.isNotEmpty
+                  ? Image.memory(base64Decode(base64Image), height: 150, width: 150, fit: BoxFit.cover)
+                  : _imagePlaceholder(),
+              SizedBox(height: 10),
+              Text("₹${updatedPrice.toStringAsFixed(2)} per kg", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text("Available: ${quantity.toStringAsFixed(1)} kg"),
+              Text("Freshness: $freshness/10", style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Close"),
+            ),
+            TextButton(
+              onPressed: () {
+                // Add to cart functionality
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Added to cart")));
+                Navigator.pop(context);
+              },
+              child: Text("Add to Cart"),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  Widget _imagePlaceholder() {
+    return Container(
+      height: 100,
+      color: Colors.grey.shade200,
+      child: Icon(Icons.image, size: 40, color: Colors.grey),
     );
   }
 
@@ -363,13 +257,11 @@ class BuyerHome extends StatelessWidget {
     return Colors.red;
   }
 
-  // Function to calculate the updated price based on the time elapsed
   double _calculatePrice(double pricePerKg, DateTime uploadDate) {
     int daysElapsed = DateTime.now().difference(uploadDate).inDays;
     return daysElapsed > 0 ? pricePerKg * (1 - (0.05 * daysElapsed)) : pricePerKg;
   }
 
-  // Function to calculate the freshness score dynamically
   int _calculateFreshness(DateTime uploadDate) {
     int daysElapsed = DateTime.now().difference(uploadDate).inDays;
     return (10 - daysElapsed).clamp(0, 10);
