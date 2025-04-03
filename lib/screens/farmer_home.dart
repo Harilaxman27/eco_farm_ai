@@ -1,4 +1,5 @@
 import 'package:eco_farm_ai/screens/crop_recommendation.dart';
+import 'package:eco_farm_ai/screens/marketplace.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
@@ -553,9 +554,12 @@ class _FarmerHomeState extends State<FarmerHome> {
           ),
           _buildDrawerItem(
             icon: Icons.store,
-            title: "Marketplace",
+            title: "Market Place",
             onTap: () {
-              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => MarketplaceScreen()),
+              );
             },
           ),
           _buildDrawerItem(
