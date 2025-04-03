@@ -15,6 +15,7 @@ class BuyerHome extends StatefulWidget {
 class _BuyerHomeState extends State<BuyerHome> {
   final FirebaseService _firebaseService = FirebaseService();
   List<Map<String, dynamic>> cartItems = [];
+  String searchQuery = "";
 
   @override
   void initState() {
@@ -34,14 +35,12 @@ class _BuyerHomeState extends State<BuyerHome> {
   Future<void> _addToCart(Map<String, dynamic> cropData) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
-    String cropName = cropData['cropName'] ?? 'Unknown Crop';
-    double pricePerKg = (cropData['pricePerKg'] as num?)?.toDouble() ?? 0.0;
-    double quantity = (cropData['quantity'] as num?)?.toDouble() ?? 0.0;
-
     Map<String, dynamic> cartItem = {
-      'cropName': cropName,
-      'pricePerKg': pricePerKg,
-      'quantity': quantity,
+      'cropId': cropData.containsKey('id') ? cropData['id'] : '',
+      'cropName': cropData['cropName'],
+      'pricePerKg': cropData['pricePerKg'],
+      'quantity': 1.0, // Default to 1kg
+      'sellerId': cropData['farmerId'],
     };
 
     List<String> currentCart = prefs.getStringList('cart') ?? [];
@@ -53,7 +52,95 @@ class _BuyerHomeState extends State<BuyerHome> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("$cropName added to cart!")),
+      SnackBar(content: Text("${cropData['cropName']} added to cart!")),
+    );
+  }
+
+  void _negotiatePrice(Map<String, dynamic> cropData, String cropId, String sellerId) async {
+    TextEditingController priceController = TextEditingController();
+    TextEditingController quantityController = TextEditingController();
+
+    // Set default quantity to the available quantity or 1 if not available
+    double availableQuantity = (cropData['quantity'] as num?)?.toDouble() ?? 1.0;
+    quantityController.text = "1.0";  // Default to 1kg
+
+    double maxQuantity = availableQuantity;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Propose Your Price"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                    labelText: "Enter your price per kg",
+                    hintText: "Current: ₹${cropData['pricePerKg'].toStringAsFixed(2)}"
+                ),
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: quantityController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: "Quantity (kg)",
+                  hintText: "Max: $maxQuantity kg",
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                double proposedPrice = double.tryParse(priceController.text) ?? 0.0;
+                double quantity = double.tryParse(quantityController.text) ?? 0.0;
+
+                if (proposedPrice <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Please enter a valid price")),
+                  );
+                  return;
+                }
+
+                if (quantity <= 0 || quantity > maxQuantity) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Please enter a valid quantity (max: $maxQuantity kg)")),
+                  );
+                  return;
+                }
+
+                try {
+                  await _firebaseService.proposePrice(
+                    sellerId: sellerId,
+                    cropId: cropId,
+                    cropName: cropData['cropName'],
+                    proposedPrice: proposedPrice,
+                    quantity: quantity,
+                  );
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Price proposal sent!")),
+                  );
+                  Navigator.pop(context);
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error: ${e.toString()}")),
+                  );
+                }
+              },
+              child: Text("Submit"),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -110,6 +197,11 @@ class _BuyerHomeState extends State<BuyerHome> {
                 filled: true,
                 fillColor: Colors.grey.shade100,
               ),
+              onChanged: (value) {
+                setState(() {
+                  searchQuery = value.toLowerCase();
+                });
+              },
             ),
           ),
           Expanded(
@@ -121,6 +213,15 @@ class _BuyerHomeState extends State<BuyerHome> {
                 }
 
                 var listings = snapshot.data!.docs;
+
+                // Filter listings based on search query if needed
+                if (searchQuery.isNotEmpty) {
+                  listings = listings.where((doc) {
+                    var data = doc.data() as Map<String, dynamic>;
+                    String cropName = data['cropName']?.toString().toLowerCase() ?? '';
+                    return cropName.contains(searchQuery);
+                  }).toList();
+                }
 
                 if (listings.isEmpty) {
                   return Center(
@@ -142,25 +243,24 @@ class _BuyerHomeState extends State<BuyerHome> {
                   padding: EdgeInsets.all(12),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    childAspectRatio: 0.75, // Increase this value to give more vertical space
+                    childAspectRatio: 0.75,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
                   ),
                   itemCount: listings.length,
                   itemBuilder: (context, index) {
-                    var crop = listings[index];
-                    var cropData = crop.data() as Map<String, dynamic>;
+                    var cropDoc = listings[index];
+                    var cropId = cropDoc.id;
+                    var cropData = cropDoc.data() as Map<String, dynamic>;
+
+                    // Add the document ID to the data for easy access
+                    cropData['id'] = cropId;
 
                     String cropName = cropData['cropName'] ?? 'Unknown Crop';
                     double quantity = (cropData['quantity'] as num?)?.toDouble() ?? 0.0;
                     double pricePerKg = (cropData['pricePerKg'] as num?)?.toDouble() ?? 0.0;
                     String base64Image = cropData['imageBase64'] ?? "";
-                    Timestamp? uploadTimestamp = cropData['uploadDate'];
-
-                    DateTime uploadDate = uploadTimestamp?.toDate() ?? DateTime.now();
-                    double updatedPrice = _calculatePrice(pricePerKg, uploadDate);
-                    int updatedFreshness = _calculateFreshness(uploadDate);
-                    Color freshnessColor = _getFreshnessColor(updatedFreshness);
+                    String sellerId = cropData['farmerId'] ?? "";
 
                     return Card(
                       elevation: 3,
@@ -170,41 +270,20 @@ class _BuyerHomeState extends State<BuyerHome> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                                child: base64Image.isNotEmpty
-                                    ? Image.memory(
-                                  base64Decode(base64Image),
-                                  height: 100,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      _imagePlaceholder(),
-                                )
-                                    : _imagePlaceholder(),
-                              ),
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: freshnessColor,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    "$updatedFreshness/10",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                          ClipRRect(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                            child: base64Image.isNotEmpty
+                                ? Image.memory(
+                              base64Decode(base64Image),
+                              height: 100,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            )
+                                : Container(
+                              height: 100,
+                              color: Colors.grey.shade200,
+                              child: Icon(Icons.image, color: Colors.grey),
+                            ),
                           ),
                           Padding(
                             padding: EdgeInsets.all(8),
@@ -213,49 +292,36 @@ class _BuyerHomeState extends State<BuyerHome> {
                               children: [
                                 Text(
                                   cropName,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                SizedBox(height: 2),
                                 Text(
                                   "${quantity.toStringAsFixed(1)} kg available",
-                                  style: TextStyle(
-                                    color: Colors.grey.shade700,
-                                    fontSize: 12,
-                                  ),
+                                  style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
                                 ),
-                                SizedBox(height: 4),
                                 Text(
-                                  "₹${updatedPrice.toStringAsFixed(2)}/kg",
-                                  style: TextStyle(
-                                    color: Colors.green.shade700,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
+                                  "₹${pricePerKg.toStringAsFixed(2)}/kg",
+                                  style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold, fontSize: 16),
                                 ),
-                                SizedBox(height: 6),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      _addToCart(cropData);
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
-                                      padding: EdgeInsets.symmetric(vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () => _negotiatePrice(cropData, cropId, sellerId),
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                                        child: Text("Negotiate"),
                                       ),
                                     ),
-                                    child: Text(
-                                      "Add to Cart",
-                                      style: TextStyle(fontSize: 12),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () => _addToCart(cropData),
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                        child: Text("Add"),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -270,28 +336,6 @@ class _BuyerHomeState extends State<BuyerHome> {
           ),
         ],
       ),
-    );
-  }
-
-  double _calculatePrice(double pricePerKg, DateTime uploadDate) {
-    int daysElapsed = DateTime.now().difference(uploadDate).inDays;
-    return daysElapsed > 0 ? pricePerKg * (1 - (0.05 * daysElapsed)) : pricePerKg;
-  }
-
-  int _calculateFreshness(DateTime uploadDate) {
-    int daysElapsed = DateTime.now().difference(uploadDate).inDays;
-    return (10 - daysElapsed).clamp(0, 10);
-  }
-
-  Color _getFreshnessColor(int freshness) {
-    return freshness >= 8 ? Colors.green : (freshness >= 5 ? Colors.orange : Colors.red);
-  }
-
-  Widget _imagePlaceholder() {
-    return Container(
-      height: 100,
-      color: Colors.grey.shade200,
-      child: Icon(Icons.image, size: 40, color: Colors.grey),
     );
   }
 }
