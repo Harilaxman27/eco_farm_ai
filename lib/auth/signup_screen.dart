@@ -11,7 +11,7 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  String selectedRole = "Farmer"; // Default role selection
+  String selectedRole = "buyer"; // Default role
 
   void registerUser() async {
     try {
@@ -64,16 +64,33 @@ class _SignupScreenState extends State<SignupScreen> {
                   decoration: InputDecoration(labelText: "Password", filled: true, fillColor: Colors.white),
                 ),
                 SizedBox(height: 10),
-                DropdownButton<String>(
-                  value: selectedRole,
-                  items: ["Farmer", "Buyer"].map((String role) {
-                    return DropdownMenuItem(value: role, child: Text(role));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedRole = value!;
-                    });
-                  },
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedRole,
+                    underline: SizedBox(),
+                    items: [
+                      "buyer",
+                      "crop_farmer",
+                      "dairy_farmer",
+                      "poultry_farmer",
+                    ].map((String role) {
+                      return DropdownMenuItem(
+                        value: role,
+                        child: Text(role.replaceAll('_', ' ').toUpperCase()),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedRole = value!;
+                      });
+                    },
+                  ),
                 ),
                 SizedBox(height: 20),
                 ElevatedButton(

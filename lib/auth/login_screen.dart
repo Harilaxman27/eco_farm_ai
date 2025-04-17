@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'signup_screen.dart';
 import '../screens/farmer_home.dart';
 import '../screens/buyer_home.dart';
+import '../screens/dairy_farmer_home.dart';
+import '../screens/poultry_farmer_home.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -26,10 +28,26 @@ class _LoginScreenState extends State<LoginScreen> {
         DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         String role = userDoc['role'];
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => role == "Farmer" ? FarmerHome() : BuyerHome()),
-        );
+        Widget destination;
+
+        switch (role) {
+          case 'buyer':
+            destination = BuyerHome();
+            break;
+          case 'crop_farmer':
+            destination = FarmerHome(); // Uses existing FarmerHome
+            break;
+          case 'dairy_farmer':
+            destination = DairyFarmerHome();
+            break;
+          case 'poultry_farmer':
+            destination = PoultryFarmerHome();
+            break;
+          default:
+            destination = BuyerHome(); // fallback
+        }
+
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => destination));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Login Failed: $e")));
