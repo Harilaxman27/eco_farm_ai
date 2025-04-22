@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'add_cow_screen.dart';
 import 'alerts_reminders.dart';
 import 'cow_milking_tracker.dart';
-import 'financials_tracker.dart';
+import 'milk_product_advisor.dart';
 import 'health_breeding_management.dart';
 import 'marketplace_screen.dart';
 import '../services/weather_service.dart';
@@ -195,12 +195,12 @@ class _DairyFarmerHomeState extends State<DairyFarmerHome> {
           ),
           _buildDrawerItem(
             icon: Icons.bar_chart,
-            title: "Financials",
+            title: "MilkProductAdvisor",
             onTap: () {
               Navigator.pop(context);
               Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => FinancialsTracker())
+                  MaterialPageRoute(builder: (_) => MilkProductAdvisor())
               );
             },
           ),
@@ -703,7 +703,7 @@ class _DairyFarmerHomeState extends State<DairyFarmerHome> {
               _quickTile(context, "Add\nCow", Icons.add_circle, AddCowScreen(), Colors.teal),
               _quickTile(context, "Milking\nTracker", Icons.opacity, CowMilkingTracker(), Colors.blue),
               _quickTile(context, "Health &\nBreeding", Icons.healing, HealthBreedingManagement(), Colors.red),
-              _quickTile(context, "Financials", Icons.bar_chart, FinancialsTracker(), Colors.green),
+              _quickTile(context, "MilkProductAdvisor", Icons.bar_chart, MilkProductAdvisor(), Colors.green),
               _quickTile(context, "Reminders", Icons.alarm, AlertsReminders(), Colors.amber),
               _quickTile(context, "Marketplace", Icons.storefront, MarketplaceScreen(), Colors.purple),
             ],
