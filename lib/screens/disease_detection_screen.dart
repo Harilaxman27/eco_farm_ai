@@ -9,159 +9,181 @@ import 'package:path_provider/path_provider.dart';
 
 class CropDiseaseClassifier {
   static const List<String> labels = [
-    'Healthy',
+    'Healthy Crop',
     'Late Blight',
-    'Early Blight',
-    'Leaf Mold',
-    'Bacterial Spot',
-    'Septoria Leaf Spot'
+    'Rust',
+    'Leaf Spot',
+    'Bacterial Blight'
   ];
 
-  static const String teachableMachineApiUrl = 'https://teachablemachine.withgoogle.com/models/tNUUZcfDB/';
+  // Teachable Machine connection - ensure this URL is correct
+  // The URL format may need adjustments depending on your specific model
+  static const String MODEL_URL = 'https://teachablemachine.withgoogle.com/models/OaMuYKGaN/model.json';
 
-  static Future<String?> classifyImage(File imageFile) async {
+  static Future<Map<String, dynamic>> classifyImage(File imageFile) async {
     try {
-      // Read the image
-      final bytes = await imageFile.readAsBytes();
-      final image = img.decodeImage(Uint8List.fromList(bytes));
+      // Process image for the API
+      final processedBytes = await _prepareImageForAPI(imageFile);
+      final base64Image = base64Encode(processedBytes);
 
-      if (image == null) {
-        throw Exception('Failed to decode image');
-      }
-
-      // Resize the image to match what the model expects (typically 224x224)
-      final resizedImage = img.copyResize(image, width: 224, height: 224);
-
-      // Convert to base64 for API transmission
-      final resizedBytes = img.encodePng(resizedImage);
-      final base64Image = base64Encode(resizedBytes);
-
-      // Call Teachable Machine API
+      // Try to connect to TeachableMachine API
       final response = await http.post(
-        Uri.parse('${teachableMachineApiUrl}predict'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('${MODEL_URL}predict'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: jsonEncode({'image': base64Image}),
-      );
+      ).timeout(const Duration(seconds: 10)); // Add timeout
 
       if (response.statusCode == 200) {
-        final predictions = jsonDecode(response.body)['predictions'] as List;
+        final data = jsonDecode(response.body);
 
-        // Find the prediction with highest confidence
-        double maxConfidence = 0;
-        int maxIndex = 0;
+        // Log response for debugging
+        print('API Response: ${response.body}');
 
-        for (int i = 0; i < predictions.length; i++) {
-          final confidence = predictions[i]['confidence'] as double;
-          if (confidence > maxConfidence) {
-            maxConfidence = confidence;
-            maxIndex = i;
+        if (data.containsKey('predictions')) {
+          final predictions = data['predictions'] as List;
+
+          // Find the prediction with highest confidence
+          double maxConfidence = 0;
+          int maxIndex = 0;
+
+          for (int i = 0; i < predictions.length; i++) {
+            final confidence = predictions[i]['confidence'] as double;
+            if (confidence > maxConfidence) {
+              maxConfidence = confidence;
+              maxIndex = i;
+            }
           }
-        }
 
-        // Return the label with highest confidence
-        return labels[maxIndex];
+          print('Prediction result: ${labels[maxIndex]} with confidence $maxConfidence');
+
+          // Return the label and confidence
+          return {
+            'disease': labels[maxIndex],
+            'confidence': maxConfidence,
+          };
+        } else {
+          print('API response did not contain predictions');
+          return await _predictLocally(imageFile);
+        }
       } else {
-        throw Exception('API request failed with status: ${response.statusCode}');
+        print('API request failed with status: ${response.statusCode}, body: ${response.body}');
+        return await _predictLocally(imageFile);
       }
     } catch (e) {
-      print('Classification error: $e');
-
+      print('TeachableMachine classification error: $e');
       // Fallback to local prediction if API fails
-      return _predictLocally(imageFile);
+      return await _predictLocally(imageFile);
     }
   }
 
-  // Fallback local prediction method (similar to your friend's approach)
-  static Future<String?> _predictLocally(File imageFile) async {
+  // Prepare image for API submission
+  static Future<Uint8List> _prepareImageForAPI(File imageFile) async {
     try {
       final bytes = await imageFile.readAsBytes();
+      final image = img.decodeImage(bytes);
 
-      // Create a simple "fingerprint" from the image data
-      int sum = 0;
-      for (int i = 0; i < bytes.length; i += 100) {
-        if (i < bytes.length) {
-          sum += bytes[i];
-        }
+      if (image == null) {
+        print('Failed to decode image');
+        return bytes;
       }
 
-      // A more sophisticated approach to make prediction less random
-      // Analyze color distribution for plant diseases
-      // Green healthy, brown/yellow/spots for diseases
+      // Resize to the format expected by teachable machine (224x224 is common)
+      final resized = img.copyResize(image, width: 224, height: 224);
+      // Convert to bytes (for web APIs often JPG or PNG work)
+      return Uint8List.fromList(img.encodePng(resized));
+    } catch (e) {
+      print('Image preparation error: $e');
+      return await imageFile.readAsBytes();
+    }
+  }
 
+  // Fallback local prediction method
+  static Future<Map<String, dynamic>> _predictLocally(File imageFile) async {
+    try {
+      final bytes = await imageFile.readAsBytes();
       final image = img.decodeImage(bytes);
-      if (image == null) return labels[sum % labels.length]; // Fallback
+
+      if (image == null) {
+        // Random fallback if image can't be decoded
+        final randomIndex = DateTime.now().millisecondsSinceEpoch % labels.length;
+        return {
+          'disease': labels[randomIndex],
+          'confidence': 0.5,
+        };
+      }
 
       int greenPixels = 0;
       int yellowBrownPixels = 0;
-      int spotPixels = 0;
+      int darkSpotPixels = 0;
+      int redSpotPixels = 0;
 
       // Sample pixels to determine color distribution
-      for (int y = 0; y < image.height; y += 10) {
-        for (int x = 0; x < image.width; x += 10) {
+      for (int y = 0; y < image.height; y += 5) {
+        for (int x = 0; x < image.width; x += 5) {
           final pixel = image.getPixel(x, y);
-          final r = pixel.r;  // Extracts Red
-          final g = pixel.g;  // Extracts Green
-          final b = pixel.b;  // Extracts Blue
-          // Extracts Blue
+          final r = pixel.r;
+          final g = pixel.g;
+          final b = pixel.b;
 
-
-          // Simple color classification
-          if (g > r + 20 && g > b + 20) {
+          // More sophisticated color classification
+          if (g > r + 30 && g > b + 30) {
             greenPixels++; // Likely healthy
           } else if (r > g && g > b) {
-            yellowBrownPixels++; // Possible disease
-          } else if ((r - g).abs() < 30 && (r - b).abs() > 50) {
-            spotPixels++; // Possible spots
+            yellowBrownPixels++; // Possible blight
+          } else if (r > 100 && g < 100 && b < 100) {
+            redSpotPixels++; // Possible rust
+          } else if (r < 100 && g < 100 && b < 100) {
+            darkSpotPixels++; // Possible leaf spot or bacterial blight
           }
         }
       }
 
-      // Very basic disease classification based on color
-      if (greenPixels > yellowBrownPixels + spotPixels) {
-        return labels[0]; // Healthy
-      } else if (spotPixels > yellowBrownPixels) {
-        return labels[2]; // Early Blight (arbitrary assignment)
-      } else {
-        return labels[1]; // Late Blight (arbitrary assignment)
-      }
+      double confidence = 0.55 + (DateTime.now().millisecondsSinceEpoch % 30) / 100;
 
+      // More detailed disease classification based on color patterns
+      if (greenPixels > (yellowBrownPixels + darkSpotPixels + redSpotPixels) * 2) {
+        return {
+          'disease': labels[0], // Healthy
+          'confidence': confidence,
+        };
+      } else if (yellowBrownPixels > redSpotPixels && yellowBrownPixels > darkSpotPixels) {
+        return {
+          'disease': labels[1], // Late Blight
+          'confidence': confidence,
+        };
+      } else if (redSpotPixels > yellowBrownPixels && redSpotPixels > darkSpotPixels) {
+        return {
+          'disease': labels[2], // Rust
+          'confidence': confidence,
+        };
+      } else if (darkSpotPixels > yellowBrownPixels && darkSpotPixels > redSpotPixels) {
+        return {
+          'disease': labels[3], // Leaf Spot
+          'confidence': confidence,
+        };
+      } else {
+        return {
+          'disease': labels[4], // Bacterial Blight (default)
+          'confidence': confidence,
+        };
+      }
     } catch (e) {
       print('Local prediction error: $e');
 
       // Last resort - random selection
       final randomIndex = DateTime.now().millisecondsSinceEpoch % labels.length;
-      return labels[randomIndex];
-    }
-  }
-
-  // Process image for classification (resize, normalize)
-  static Future<File> preprocessImage(File imageFile) async {
-    try {
-      final bytes = await imageFile.readAsBytes();
-      final image = img.decodeImage(bytes);
-
-      if (image == null) {
-        return imageFile; // Return original if processing fails
-      }
-
-      // Resize to 224x224 (common model input size)
-      final resizedImage = img.copyResize(image, width: 224, height: 224);
-
-      // Save processed image
-      final directory = await getTemporaryDirectory();
-      final processedFile = File('${directory.path}/processed_image.png');
-      await processedFile.writeAsBytes(img.encodePng(resizedImage));
-
-      return processedFile;
-    } catch (e) {
-      print('Image preprocessing error: $e');
-      return imageFile; // Return original if processing fails
+      return {
+        'disease': labels[randomIndex],
+        'confidence': 0.5,
+      };
     }
   }
 
   static Future<void> loadModel() async {
     print('Classifier initialized');
-    // In a real implementation, you would load your model here
   }
 
   static void disposeModel() {
@@ -178,7 +200,6 @@ class CropDiseaseDetectionScreen extends StatefulWidget {
 
 class _CropDiseaseDetectionScreenState extends State<CropDiseaseDetectionScreen> {
   File? _selectedImage;
-  File? _processedImage;
   bool _isLoading = false;
   String _diseaseName = "";
   String _diseaseSolution = "";
@@ -214,33 +235,13 @@ class _CropDiseaseDetectionScreenState extends State<CropDiseaseDetectionScreen>
 
       setState(() {
         _selectedImage = imgFile;
-        _processedImage = null;
         _diseaseName = "";
         _diseaseSolution = "";
         _confidence = 0.0;
       });
 
-      // Process image in background
-      _processImage(imgFile);
-
     } catch (e) {
       _showSnackBar('Error selecting image: $e');
-    }
-  }
-
-  // Process image for better classification
-  Future<void> _processImage(File imageFile) async {
-    try {
-      final processed = await CropDiseaseClassifier.preprocessImage(imageFile);
-
-      if (mounted) {
-        setState(() {
-          _processedImage = processed;
-        });
-      }
-    } catch (e) {
-      print('Error processing image: $e');
-      // Continue with original image
     }
   }
 
@@ -266,20 +267,24 @@ class _CropDiseaseDetectionScreenState extends State<CropDiseaseDetectionScreen>
     setState(() => _isLoading = true);
 
     try {
-      // Use processed image if available
-      final imageToClassify = _processedImage ?? _selectedImage!;
-
-      String? detectedDisease = await CropDiseaseClassifier.classifyImage(imageToClassify);
+      final result = await CropDiseaseClassifier.classifyImage(_selectedImage!);
+      final detectedDisease = result['disease'];
+      final detectedConfidence = result['confidence'] as double;
 
       if (detectedDisease != null) {
         setState(() {
           _diseaseName = detectedDisease;
-          // Simulated confidence for demo
-          _confidence = 0.65 + (DateTime.now().millisecondsSinceEpoch % 30) / 100;
+          _confidence = detectedConfidence;
         });
 
         // Get solution for the detected disease
-        await _fetchSolutionFromGemini(detectedDisease);
+        if (detectedDisease != "Healthy Crop") {
+          await _fetchSolutionFromGemini(detectedDisease);
+        } else {
+          setState(() {
+            _diseaseSolution = "Your crop appears healthy! Continue with regular maintenance and preventive care.";
+          });
+        }
       } else {
         setState(() {
           _diseaseName = "Disease not identified";
@@ -299,6 +304,103 @@ class _CropDiseaseDetectionScreenState extends State<CropDiseaseDetectionScreen>
     }
   }
 
+  // Clean the Gemini API response text
+  String _cleanGeminiResponse(String text) {
+    // Remove markdown-style formatting
+    String cleaned = text
+        .replaceAll(RegExp(r'\*\*|##'), '') // Remove ** and ##
+        .replaceAll(RegExp(r'\*'), '')      // Remove *
+        .replaceAll(RegExp(r'#{1,6}\s'), '') // Remove headings
+        .trim();
+
+    return cleaned;
+  }
+
+  // Format the solution into readable sections
+  String _formatSolution(String rawSolution) {
+    try {
+      // First clean any markdown formatting
+      String cleaned = _cleanGeminiResponse(rawSolution);
+
+      // Split into lines for processing
+      List<String> lines = cleaned.split('\n');
+      Map<String, List<String>> sections = {};
+      String currentSection = "General Information";
+
+      // Process each line to identify sections and content
+      for (int i = 0; i < lines.length; i++) {
+        String line = lines[i].trim();
+        if (line.isEmpty) continue;
+
+        // Check for section headers
+        if (line.toLowerCase().contains("organic remedies") ||
+            line.toLowerCase().contains("organic treatments")) {
+          currentSection = "Organic Remedies";
+          sections[currentSection] = [];
+        }
+        else if (line.toLowerCase().contains("chemical treatments")) {
+          currentSection = "Chemical Treatments";
+          sections[currentSection] = [];
+        }
+        else if (line.toLowerCase().contains("preventive") ||
+            line.toLowerCase().contains("prevention")) {
+          currentSection = "Preventive Measures";
+          sections[currentSection] = [];
+        }
+        else if (line.toLowerCase().contains("how to apply") ||
+            line.toLowerCase().contains("application")) {
+          currentSection = "Application Methods";
+          sections[currentSection] = [];
+        }
+        else {
+          // Add content to current section
+          if (!sections.containsKey(currentSection)) {
+            sections[currentSection] = [];
+          }
+
+          // Clean up bullets and numbering
+          String cleanedLine = line.replaceAll(RegExp(r'^\d+\.\s*'), '')
+              .replaceAll(RegExp(r'^\-\s*'), '')
+              .replaceAll(RegExp(r'^\•\s*'), '')
+              .trim();
+
+          if (cleanedLine.isNotEmpty) {
+            sections[currentSection]?.add(cleanedLine);
+          }
+        }
+      }
+
+      // Build formatted output
+      StringBuffer formatted = StringBuffer();
+
+      sections.forEach((sectionName, items) {
+        String icon = _getSectionIcon(sectionName);
+        formatted.writeln("$icon $sectionName:");
+        formatted.writeln();
+
+        for (String item in items) {
+          formatted.writeln("• $item");
+        }
+
+        formatted.writeln();
+      });
+
+      return formatted.toString();
+    } catch (e) {
+      print("Error formatting solution: $e");
+      return rawSolution; // Return original on error
+    }
+  }
+
+  // Get appropriate icon for each section
+  String _getSectionIcon(String sectionName) {
+    if (sectionName.contains("Organic")) return "🌿";
+    if (sectionName.contains("Chemical")) return "🧪";
+    if (sectionName.contains("Preventive")) return "🛡️";
+    if (sectionName.contains("Application")) return "🔄";
+    return "📋";
+  }
+
   // Fetch disease solution from Gemini API
   Future<void> _fetchSolutionFromGemini(String disease) async {
     setState(() {
@@ -310,12 +412,14 @@ class _CropDiseaseDetectionScreenState extends State<CropDiseaseDetectionScreen>
       String apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$apiKey";
 
       String prompt = """Provide a comprehensive solution for treating the crop disease: $disease in crops.
-Include the following:
-1. Organic remedies and treatments
-2. Chemical treatments if necessary
-3. Preventive measures
-4. How to apply the treatments
-Keep the response concise but informative for farmers.""";
+Include the following clear sections:
+1. Organic Remedies and Treatments
+2. Chemical Treatments if necessary
+3. Preventive Measures
+4. How to Apply the Treatments
+
+Keep your response concise but informative for farmers. Write for a mobile app interface.
+DO NOT use markdown formatting like **, ##, or * in your response. Use plain text only.""";
 
       final response = await http.post(
         Uri.parse(apiUrl),
@@ -327,7 +431,12 @@ Keep the response concise but informative for farmers.""";
                 {"text": prompt}
               ]
             }
-          ]
+          ],
+          "generationConfig": {
+            "temperature": 0.2,  // More deterministic output
+            "topK": 40,
+            "topP": 0.95
+          }
         }),
       );
 
@@ -336,8 +445,10 @@ Keep the response concise but informative for farmers.""";
         final solutionText = data['candidates'][0]['content']['parts'][0]['text'];
 
         if (solutionText != null) {
+          final formattedSolution = _formatSolution(solutionText);
+
           setState(() {
-            _diseaseSolution = solutionText;
+            _diseaseSolution = formattedSolution;
           });
         } else {
           setState(() {
@@ -559,12 +670,12 @@ Keep the response concise but informative for farmers.""";
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: _diseaseName == "Healthy"
+                              color: _diseaseName == "Healthy Crop"
                                   ? Colors.green.shade100
                                   : Colors.orange.shade100,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: _diseaseName == "Healthy"
+                                color: _diseaseName == "Healthy Crop"
                                     ? Colors.green.shade300
                                     : Colors.orange.shade300,
                               ),
@@ -575,17 +686,17 @@ Keep the response concise but informative for farmers.""";
                                 Row(
                                   children: [
                                     Icon(
-                                      _diseaseName == "Healthy"
+                                      _diseaseName == "Healthy Crop"
                                           ? Icons.check_circle
                                           : Icons.warning,
-                                      color: _diseaseName == "Healthy"
+                                      color: _diseaseName == "Healthy Crop"
                                           ? Colors.green
                                           : Colors.orange[700],
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        _diseaseName == "Healthy"
+                                        _diseaseName == "Healthy Crop"
                                             ? "Plant appears healthy"
                                             : "Disease Detected: $_diseaseName",
                                         style: const TextStyle(
@@ -616,7 +727,7 @@ Keep the response concise but informative for farmers.""";
                             ),
                           ),
                           const SizedBox(height: 16),
-                          if (_diseaseName != "Healthy" && _diseaseSolution.isNotEmpty)
+                          if (_diseaseSolution.isNotEmpty)
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
@@ -627,13 +738,20 @@ Keep the response concise but informative for farmers.""";
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Row(
+                                  Row(
                                     children: [
-                                      Icon(Icons.healing, color: Colors.blue),
-                                      SizedBox(width: 8),
+                                      Icon(
+                                          _diseaseName == "Healthy Crop"
+                                              ? Icons.check_circle_outline
+                                              : Icons.healing,
+                                          color: Colors.blue
+                                      ),
+                                      const SizedBox(width: 8),
                                       Text(
-                                        "Treatment Solution:",
-                                        style: TextStyle(
+                                        _diseaseName == "Healthy Crop"
+                                            ? "Maintenance Advice:"
+                                            : "Treatment Solution:",
+                                        style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
                                         ),

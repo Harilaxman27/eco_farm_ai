@@ -194,7 +194,7 @@ class _DairyFarmerHomeState extends State<DairyFarmerHome> {
             },
           ),
           _buildDrawerItem(
-            icon: Icons.bar_chart,
+            icon: Icons.emoji_food_beverage,
             title: "MilkProductAdvisor",
             onTap: () {
               Navigator.pop(context);
@@ -703,7 +703,7 @@ class _DairyFarmerHomeState extends State<DairyFarmerHome> {
               _quickTile(context, "Add\nCow", Icons.add_circle, AddCowScreen(), Colors.teal),
               _quickTile(context, "Milking\nTracker", Icons.opacity, CowMilkingTracker(), Colors.blue),
               _quickTile(context, "Health &\nBreeding", Icons.healing, HealthBreedingManagement(), Colors.red),
-              _quickTile(context, "MilkProductAdvisor", Icons.bar_chart, MilkProductAdvisor(), Colors.green),
+              _quickTile(context, "MilkProductAdvisor", Icons.emoji_food_beverage, MilkProductAdvisor(), Colors.green),
               _quickTile(context, "Reminders", Icons.alarm, AlertsReminders(), Colors.amber),
               _quickTile(context, "Marketplace", Icons.storefront, MarketplaceScreen(), Colors.purple),
             ],
