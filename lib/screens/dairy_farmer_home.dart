@@ -222,7 +222,7 @@ class _DairyFarmerHomeState extends State<DairyFarmerHome> {
               Navigator.pop(context);
               Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => MarketplaceScreen())
+                  MaterialPageRoute(builder: (_) => DairyMarketplaceScreen())
               );
             },
           ),
@@ -705,7 +705,7 @@ class _DairyFarmerHomeState extends State<DairyFarmerHome> {
               _quickTile(context, "Health &\nBreeding", Icons.healing, HealthBreedingManagement(), Colors.red),
               _quickTile(context, "MilkProductAdvisor", Icons.emoji_food_beverage, MilkProductAdvisor(), Colors.green),
               _quickTile(context, "Reminders", Icons.alarm, AlertsReminders(), Colors.amber),
-              _quickTile(context, "Marketplace", Icons.storefront, MarketplaceScreen(), Colors.purple),
+              _quickTile(context, "Marketplace", Icons.storefront, DairyMarketplaceScreen(), Colors.purple),
             ],
           ),
         ],
