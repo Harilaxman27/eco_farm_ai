@@ -8,6 +8,7 @@ import 'health_breeding_management.dart';
 import 'marketplace_screen.dart';
 import '../services/weather_service.dart';
 import '../auth/login_screen.dart';
+import 'dairy_financials_page.dart';
 
 class DairyFarmerHome extends StatefulWidget {
   const DairyFarmerHome({super.key});
@@ -224,6 +225,13 @@ class _DairyFarmerHomeState extends State<DairyFarmerHome> {
                   context,
                   MaterialPageRoute(builder: (_) => DairyMarketplaceScreen())
               );
+            },
+          ),
+          _buildDrawerItem(
+            icon: Icons.account_balance_wallet,
+            title: "Financial farmer",
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => DairyFinancialsPage()));
             },
           ),
           const Divider(),
