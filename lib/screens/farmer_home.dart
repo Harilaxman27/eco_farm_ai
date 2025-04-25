@@ -7,6 +7,7 @@ import '../services/weather_service.dart';
 import '../services/news_service.dart';
 import 'disease_detection_screen.dart';
 import 'news_page.dart';
+import 'financials_page.dart';
 
 class FarmerHome extends StatefulWidget {
   @override
@@ -563,6 +564,13 @@ class _FarmerHomeState extends State<FarmerHome> {
             title: "Multi-Language Support",
             onTap: () {
               Navigator.pop(context);
+            },
+          ),
+          _buildDrawerItem(
+            icon: Icons.account_balance_wallet,
+            title: "Financial farmer",
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => FinancialsPage()));
             },
           ),
           Divider(),
